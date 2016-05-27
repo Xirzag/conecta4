@@ -81,8 +81,10 @@ def alphabeta_search(state, game, d=4, cutoff_test=None, eval_fn=None):
     player = game.to_move(state)
 
     def max_value(state, alpha, beta, depth):
+        state.realPlayer = player
+        state.d = d
         if cutoff_test(state, depth):
-            return eval_fn(state, player)
+            return eval_fn(state)
         v = -infinity
         for (a, s) in game.successors(state):
             v = max(v, min_value(s, alpha, beta, depth+1))
@@ -92,8 +94,10 @@ def alphabeta_search(state, game, d=4, cutoff_test=None, eval_fn=None):
         return v
 
     def min_value(state, alpha, beta, depth):
+        state.realPlayer = player
+        state.d = d
         if cutoff_test(state, depth):
-            return eval_fn(state, player)
+            return eval_fn(state)
         v = infinity
         for (a, s) in game.successors(state):
             v = min(v, max_value(s, alpha, beta, depth+1))
@@ -106,8 +110,16 @@ def alphabeta_search(state, game, d=4, cutoff_test=None, eval_fn=None):
     # The default test cuts off at depth d or at a terminal state
     cutoff_test = (cutoff_test or
                    (lambda state,depth: depth>d or game.terminal_test(state)))
-    eval_fn = eval_fn or (lambda state, player: game.utility(state, player))
-    action, state = argmax(game.successors(state),
+    eval_fn = eval_fn or (lambda state: game.utility(state, player))
+
+    lista = game.successors(state)
+
+
+    # for i in lista:
+    #     print i
+    #     print "------\n"
+
+    action, state = argmax(lista,
                            lambda ((a, s)): min_value(s, -infinity, infinity, 0))
 
     return action
@@ -158,7 +170,7 @@ class Game:
     def make_move(self, move, state):
         "Return the state that results from making a move from a state."
         abstract
-            
+
     def utility(self, state, player):
         "Return the value of this final state to player."
         abstract
@@ -183,147 +195,6 @@ class Game:
     def __repr__(self):
         return '<%s>' % self.__class__.__name__
 
-class ConectaCuatro(Game):
-
-    def __init__(self, k=4):
-        h = k * 2 - 2
-        v = k * 2 - 1
-        matches = []
-        players = ['X','O']
-        for n in range(0, len(players)):
-            for i in range(0, k):
-                matches.append([])
-                for j in range(0, k):
-                    if j < k - 1 - i:
-                        matches[i + n * k].append('.')
-                    else:
-                        matches[i + n * k].append(players[n])
-        update(self, h=h, v=v, k=k, matches=matches)
-        moves = [y for y in range(1,v+1)]
-        reached_heights=[0 for y in range(1,v+1)]
-        self.initial = Struct(to_move=players[0], board={}, moves=moves, reached_heights=reached_heights, nmoves=0)
-
-    def make_move(self, move, state):
-        if move not in state.moves:
-            return state
-        reached_heights = list(state.reached_heights)
-        row = self.h - reached_heights[move-1]
-        reached_heights[move-1] += 1
-        board = state.board.copy()
-        board[(row, move)] = state.to_move
-        moves=list(state.moves)
-        if row == 1:
-            moves.remove(move)
-        nmoves = state.nmoves + 1
-        return Struct(to_move=if_(state.to_move=='X','O','X'),
-                      utility=self.compute_utility(board,nmoves),
-                      board=board,moves=moves,reached_heights=reached_heights, nmoves=nmoves)
-
-    def legal_moves(self, state):
-        "Legal moves are any square not yet taken."
-        return state.moves
-
-    def utility(self, state, player):
-        "Return the value to X; 1 for win, -1 for loss, 0 otherwise."
-        if player == 'X':
-            return state.utility
-        else:
-            return -state.utility
-
-    def terminal_test(self, state):
-        "A state is terminal if it is won or there are no empty squares."
-        return self.check_win_condition(state.board) or len(state.moves) == 0
-
-    def display(self, state):
-        board = state.board
-        for x in range(1, self.h+1):
-            for y in range(1, self.v+1):
-                print board.get((x, y), '.'),
-            print
-
-        for x in range(1, self.v+1):
-            print x,
-        print
-
-    def check_win_condition(self, board):
-        player_X = ['X' for n in range(0,self.k)]
-        player_O = ['O' for n in range(0,self.k)]
-        for x in range(1, self.h-self.k+2):
-            for y in range(1, self.v+1):
-                next_four = [board.get((x+n, y), '.') for n in range(0,self.k)]
-                if next_four == player_X or next_four == player_O:
-                    return True
-                if y < self.v-self.k+2:
-                    next_four = [board.get((x, y+n), '.') for n in range(0,self.k)]
-                    if next_four == player_X or next_four == player_O:
-                        return True
-                    next_four = [board.get((x+n, y+n), '.') for n in range(0,self.k)]
-                    if next_four == player_X or next_four == player_O:
-                        return True
-                if y >= self.k:
-                    next_four = [board.get((x+n, y-n), '.') for n in range(0,self.k)]
-                    if next_four == player_X or next_four == player_O:
-                        return True
-        for x in range(self.h-self.k+2, self.h+1):
-            for y in range(1, self.v-self.k+2):
-                next_four = [board.get((x, y+n), '.') for n in range(0,self.k)]
-                if next_four == player_X or next_four == player_O:
-                    return True
-        return False
-
-    def count_matches(self, board):
-        counts = [0 for n in range(0, len(self.matches))]
-        for x in range(1, self.h-self.k+2):
-            for y in range(1, self.v+1):
-                next_four = sorted([board.get((x+n, y), '.') for n in range(0,self.k)])
-                for n in range(0, len(self.matches)):
-                    if next_four == self.matches[n]:
-                        counts[n] += 1
-                if y < self.v-self.k+2:
-                    next_four = sorted([board.get((x, y+n), '.') for n in range(0,self.k)])
-                    for n in range(0, len(self.matches)):
-                        if next_four == self.matches[n]:
-                            counts[n] += 1
-                    next_four = sorted([board.get((x+n, y+n), '.') for n in range(0,self.k)])
-                    for n in range(0, len(self.matches)):
-                        if next_four == self.matches[n]:
-                            counts[n] += 1
-                if y >= self.k:
-                    next_four = sorted([board.get((x+n, y-n), '.') for n in range(0,self.k)])
-                    for n in range(0, len(self.matches)):
-                        if next_four == self.matches[n]:
-                            counts[n] += 1
-        for x in range(self.h-self.k+2, self.h+1):
-            for y in range(1, self.v-self.k+2):
-                next_four = sorted([board.get((x, y+n), '.') for n in range(0,self.k)])
-                for n in range(0, len(self.matches)):
-                    if next_four == self.matches[n]:
-                        counts[n] += 1
-        return counts
-
-    def compute_utility(self, board, nmoves):
-        counts = self.count_matches(board)
-        players = ['X','O']
-        for n in range(0, len(players)):
-            if counts[self.k - 1 + n * self.k] > 0:
-                if players[n] == 'X':
-                    return 10000 - nmoves
-                else:
-                    return -10000 + nmoves
-        return self.weigth_utility(counts)
-
-    def weigth_utility(self,counts):
-        positive_utility = 0
-        negative_utility = 0
-        players = ['X','O']
-        for i in range(0, len(players)):
-            if players[i] == 'X':
-                for j in range(0, self.k-1):
-                    positive_utility += counts[j + i * self.k] * (5 ** j)
-            else:
-                for j in range(0, self.k-1):
-                    negative_utility += counts[j + i * self.k] * (5 ** j)
-        return positive_utility - negative_utility
 
 class TicTacToe(Game):
     """Play TicTacToe on an h x v board, with Max (first player) playing 'X'.
@@ -351,13 +222,16 @@ class TicTacToe(Game):
                       utility=self.compute_utility(board, move, state.to_move),
                       board=board, moves=moves)
 
+    def not_to_move(self, state):
+        return if_(state.to_move == 'X', 'O', 'X')
+
     def utility(self, state, player):
         "Return the value to X; 1 for win, -1 for loss, 0 otherwise."
         if player == 'X':
             return state.utility
         if player == 'O':
             return -state.utility
-        #return state.utility
+        return state.utility
 
     def terminal_test(self, state):
         "A state is terminal if it is won or there are no empty squares."
@@ -365,10 +239,13 @@ class TicTacToe(Game):
 
     def display(self, state):
         board = state.board
-        for x in range(1, self.h+1):
-            for y in range(1, self.v+1):
+        for y in range(self.v, 0, -1):
+            for x in range(1, self.h+1):
                 print board.get((x, y), '.'),
             print
+        print "-------------------"
+        for n in range(1, self.h+1):
+            print n,
 
     def compute_utility(self, board, move, player):
         "If X wins with this move, return 1; if O return -1; else return 0."
@@ -398,11 +275,12 @@ class ConnectFour(TicTacToe):
     """A TicTacToe-like game in which you can only make a move on the bottom
     row, or in a square directly above an occupied square.  Traditionally
     played on a 7x6 board and requiring 4 in a row."""
-    
+
     def __init__(self, h=7, v=6, k=4):
         TicTacToe.__init__(self, h, v, k)
 
     def legal_moves(self, state):
         "Legal moves are any square not yet taken."
+
         return [(x, y) for (x, y) in state.moves
-                if y == 0 or (x, y-1) in state.board]
+                if y == 1 or (x, y-1) in state.board]

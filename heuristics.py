@@ -1,37 +1,37 @@
 import random
 
-def random(state, player):
+def zero(state):
+    return 0
+
+def randomChoice(state):
     return random.random()*5
 
-def normal(state, player):
+def normal(state):
     return state.utility
 
-def center(state, player):
+def center(state):
     heuristic = 0
     for col in range(3, 6):
         for row in range(1, 7):
-            if(state.board.get((col, row), None) == player):
+            if(state.board.get((col, row), None) == 'X'):
                 heuristic += 1
-            elif(state.board.get((col, row), None) != player):
+            elif(state.board.get((col, row), None) != 'X'):
                 heuristic -= 1
 
     final = heuristic + (random.random()-0.5)
     return final
 
-def maxRows(state, player):
+def maxRows(state):
     maxInRows = 0
     for row in range(1, 7):
         maxInRow = 0
         for col in range(1, 8):
-            if(state.board.get((col, row), None) == player):
+            if(state.board.get((col, row), None) == 'X'):
                 maxInRow += 1
 
         maxInRows = max(maxInRows, maxInRow);
 
     final = maxInRows + (random.random()-0.5)
-<<<<<<< HEAD
-    return final
-=======
     return final
 
 
@@ -127,4 +127,3 @@ def chachi_cutoff(state, depth):
     return depth > state.d or is_terminal_state
 
 
->>>>>>> 89c3886... Final
